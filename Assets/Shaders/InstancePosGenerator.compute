@@ -1,0 +1,74 @@
+// Each #kernel tells which function to compile; you can have many kernels
+#include "noise.hlsl"
+#pragma kernel CSMain
+
+RWStructuredBuffer<float3> _Positions;
+RWStructuredBuffer<float3> _Positions2;
+uint _Resolution;
+float _Density;
+float _RandomFactor;
+
+float _Octaves;
+float _Tiling;
+float _GrowValue;
+float _GrowValue2;
+
+void SetPosition (uint3 id, float3 position) {
+	if (id.x < _Resolution && id.y < _Resolution) {
+		_Positions[id.x + id.y * _Resolution] = position;
+	}
+}
+void SetPosition2 (uint3 id, float3 position) {
+	if (id.x < _Resolution && id.y < _Resolution) {
+		_Positions2[id.x + id.y * _Resolution] = position;
+	}
+}
+
+[numthreads(8,8,1)]
+void CSMain (uint3 id : SV_DispatchThreadID)
+{
+    // fetch group info
+    float group = floor(_Resolution/8);
+
+    float ditherPatter[4][4] = {
+        {0,  8,  2,  10},
+        {12, 4, 14,  6},
+        {3,  11, 1,  9},
+        {15, 7,  13, 5}
+    };
+
+    // .xz position affected by resolution and density
+    float x = ((float)id.x*2-8*group)*_Density;
+    float z = ((float)id.y*2-8*group)*_Density;
+
+    //float noise = perlinNoise(float2(x, z), 0.1);
+    float noise = 0;
+    for (float i = 0; i < _Octaves; i ++) {
+        float a = pow(2, i);
+        noise += perlinNoise(float2(x, z), _Tiling * a)/a;
+    }
+    noise = (noise + 1)/2; // convert from -1,1 to 0,1
+    float density_noise_1 = 1-noise;
+    density_noise_1 *= _GrowValue;
+
+    float density_noise_2 = noise * _GrowValue2;
+
+    float density_noise_1_2 = density_noise_1 + density_noise_2; // simply add them together!!
+
+    // generate dither value for the placement
+    float r = ditherPatter[id.x%4][id.y%4]/16;
+
+    if (r < density_noise_1) {
+        // get random offset along witht the direction
+        float2 dir = normalize(randomGradient(float2(x, z)))*_RandomFactor;
+        SetPosition(id, float3(x+dir.x, noise, z+dir.y));        
+        SetPosition2(id, float3(0,5,0));        
+    } else if (r < density_noise_1_2 && r >= density_noise_1) {
+        float2 dir = normalize(randomGradient(float2(x, z)))*_RandomFactor;
+        SetPosition2(id, float3(x+dir.x, noise, z+dir.y));        
+        SetPosition(id, float3(0,5,0));        
+    } else {
+        SetPosition(id, float3(0,5,0));
+        SetPosition2(id, float3(0,5,0));
+    }
+}
