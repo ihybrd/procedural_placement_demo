@@ -56,6 +56,8 @@ namespace Demo_ProceduralPlacement
 		ComputeBuffer positionsBufferA;
 		ComputeBuffer positionsBufferB;
 
+		public GameObject player;
+
 		void OnEnable()
 		{
 			positionsBufferA = new ComputeBuffer(resolution * resolution, 3 * 4);
@@ -109,8 +111,8 @@ namespace Demo_ProceduralPlacement
 					{
 						Vector3 pos = (Vector3)data[i];
 						// set condition to only spawn what's needed
-						Debug.Log(Vector3.Distance(Vector3.zero, data[i]));
-						if (Vector3.Distance(Vector3.zero, data[i]) < 3 )//&& pos != Vector3.zero)
+						// Debug.Log(Vector3.Distance(Vector3.zero, data[i]));
+						if (Vector3.Distance(player.transform.position, data[i]) < 3 )//&& pos != Vector3.zero)
 						{
 							pos.y *= 10;
 							GameObject col = Instantiate(instanceBCollider, pos, Quaternion.identity);
