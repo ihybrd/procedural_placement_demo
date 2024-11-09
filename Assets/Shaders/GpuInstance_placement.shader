@@ -12,6 +12,7 @@ Shader "Demo/GpuInstance_placement"
         Pass
         {
             CGPROGRAM
+            #pragma target 5.0
             #pragma vertex vert
             #pragma fragment frag
 
@@ -27,7 +28,7 @@ Shader "Demo/GpuInstance_placement"
             };
 
             uniform float4x4 _ObjectToWorld;
-            RWStructuredBuffer<float3> _Positions;
+            StructuredBuffer<float3> _Positions;
 
             float _Tiling;
             float _Octaves;
