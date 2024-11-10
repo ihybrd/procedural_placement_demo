@@ -22,6 +22,8 @@ namespace Demo_ProceduralPlacement
 		[SerializeField]
 		ComputeShader computeShader;
 
+		[Header("___ Instance A/B material and mesh ___")]
+
 		[SerializeField]
 		Material instanceAMaterial;
 
@@ -34,10 +36,15 @@ namespace Demo_ProceduralPlacement
 		[SerializeField]
 		Mesh instanceBMesh;
 
+		[Header("___ Collision for Instance B ___")]
 		public GameObject instanceBCollider;
 		public GameObject collisionParent;
+		public GameObject player;
 
 		int resolution = 10;
+
+		[Header("___ Density map choice ___")]
+		public DensityChoices densityChoice;
 
 		public enum DensityChoices{
 			DitherConstant,
@@ -46,25 +53,25 @@ namespace Demo_ProceduralPlacement
 			DitherLayered
 		}
 
-		public DensityChoices densityChoice;
 		int densityChoiceId;
 
 		[SerializeField, Range(0f, 1f)]
-		float densityConstant = 1;
+		float ditherConstant = 1;
+
+		public float instanceALayeredDitherFactor = 1;
+		public float instanceBLayeredDitherFactor = 1;
+
+		ComputeBuffer positionsBufferA;
+		ComputeBuffer positionsBufferB;
+
+		[Header("___ general instance control ___")]
 		[SerializeField, Range(0.1f, 0.2f)]
 		float spacing = 0.165f;
 
 		[SerializeField, Range(0, 1)]
 		float randomFactor = 0;
 
-		public float instanceADensityMapFactor = 1;
-		public float instanceBDensityMapFactor = 1;
-
-		ComputeBuffer positionsBufferA;
-		ComputeBuffer positionsBufferB;
-
-		public GameObject player;
-		public bool useScale;
+		public bool useHeightBasedScale;
 		public bool invertScale;
 		Material terrainMaterial;
 
@@ -115,15 +122,15 @@ namespace Demo_ProceduralPlacement
 			resolution = numOfGroups * numOfThreads;
 
 			computeShader.SetInt(resolutionId, resolution);
-			computeShader.SetFloat(densityId, densityConstant);
+			computeShader.SetFloat(densityId, ditherConstant);
 			computeShader.SetFloat("_Spacing", spacing);
 			computeShader.SetInt("_DensityChoice", densityChoiceId);
 			computeShader.SetFloat(randomFactorId, randomFactor);
 			computeShader.SetFloat(tilingId, terrainMaterial.GetFloat("_Tiling"));
 			computeShader.SetFloat(octaveId, terrainMaterial.GetFloat("_Octaves"));
 			computeShader.SetFloat("_DisplacementAmount", terrainMaterial.GetFloat("_DisplacementAmount"));
-			computeShader.SetFloat(growValId, instanceADensityMapFactor);
-			computeShader.SetFloat(growValId2, instanceBDensityMapFactor);
+			computeShader.SetFloat(growValId, instanceALayeredDitherFactor);
+			computeShader.SetFloat(growValId2, instanceBLayeredDitherFactor);
 
 			var kernelIndex = computeShader.FindKernel("CSMain");
 			computeShader.SetBuffer(kernelIndex, positionsId, positionsBufferA);
@@ -160,8 +167,8 @@ namespace Demo_ProceduralPlacement
 
 			instanceAMaterial.SetBuffer(positionsId, positionsBufferA);
 			instanceBMaterial.SetBuffer(positionsId, positionsBufferB);
-			instanceAMaterial.SetFloat("_UseScale", (float)(useScale ? 1.0 : 0.0));
-			instanceBMaterial.SetFloat("_UseScale", (float)(useScale ? 1.0 : 0.0));
+			instanceAMaterial.SetFloat("_UseScale", (float)(useHeightBasedScale ? 1.0 : 0.0));
+			instanceBMaterial.SetFloat("_UseScale", (float)(useHeightBasedScale ? 1.0 : 0.0));
 			instanceAMaterial.SetFloat("_InvertScale", (float)(invertScale ? 1.0 : 0.0));
 			instanceBMaterial.SetFloat("_InvertScale", (float)(invertScale ? 1.0 : 0.0));
 			instanceAMaterial.SetFloat("_DisplacementAmount", terrainMaterial.GetFloat("_DisplacementAmount"));
