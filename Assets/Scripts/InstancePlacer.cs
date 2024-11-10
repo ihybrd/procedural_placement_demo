@@ -7,8 +7,6 @@ namespace Demo_ProceduralPlacement
 	[ExecuteInEditMode]
 	public class InstancePlacer : MonoBehaviour
 	{
-		const int maxResolution = 1000;
-
 		static readonly int
 			positionsId = Shader.PropertyToID("_Positions"),
 			positionsId2 = Shader.PropertyToID("_Positions2"),
@@ -39,29 +37,59 @@ namespace Demo_ProceduralPlacement
 		public GameObject instanceBCollider;
 		public GameObject collisionParent;
 
-		[SerializeField, Range(10, maxResolution)]
 		int resolution = 10;
 
-		[SerializeField, Range(0.1f, 10)]
-		float density = 1;
+		public enum DensityChoices{
+			DitherConstant,
+			DitherAlongX,
+			DitherBasedOnHeight,
+			DitherLayered
+		}
+
+		public DensityChoices densityChoice;
+		int densityChoiceId;
+
+		[SerializeField, Range(0f, 1f)]
+		float densityConstant = 1;
+		[SerializeField, Range(0.1f, 0.2f)]
+		float spacing = 0.165f;
 
 		[SerializeField, Range(0, 1)]
 		float randomFactor = 0;
 
-		public float tiling = 0.1f;
-		public float octaves = 5;
-		public float grow = 1;
-		public float grow2 = 1;
+		public float instanceADensityMapFactor = 1;
+		public float instanceBDensityMapFactor = 1;
 
 		ComputeBuffer positionsBufferA;
 		ComputeBuffer positionsBufferB;
 
 		public GameObject player;
+		public bool useScale;
+		public bool invertScale;
+		Material terrainMaterial;
+
+		void OnValidate(){
+			if (densityChoice == DensityChoices.DitherConstant) {
+				densityChoiceId = 0;
+			} else if (densityChoice == DensityChoices.DitherAlongX) {
+				densityChoiceId = 1;
+			} else if (densityChoice == DensityChoices.DitherBasedOnHeight) {
+				densityChoiceId = 2;
+			} else {
+				densityChoiceId = 3;
+			}
+		}
 
 		void OnEnable()
 		{
+			int numOfGroups = 8;
+			int numOfThreads = 16;
+			resolution = numOfGroups * numOfThreads;
 			positionsBufferA = new ComputeBuffer(resolution * resolution, 3 * 4);
 			positionsBufferB = new ComputeBuffer(resolution * resolution, 3 * 4);
+
+			GameObject terrainObj = GameObject.Find("highResPlane");
+			terrainMaterial = terrainObj.GetComponent<MeshRenderer>().sharedMaterial;
 		}
 
 		void OnDisable()
@@ -81,20 +109,27 @@ namespace Demo_ProceduralPlacement
 
 		public void UpdateFunctionOnGPU()
 		{
+
+			int numOfGroups = 8;
+			int numOfThreads = 16;
+			resolution = numOfGroups * numOfThreads;
+
 			computeShader.SetInt(resolutionId, resolution);
-			computeShader.SetFloat(densityId, density);
+			computeShader.SetFloat(densityId, densityConstant);
+			computeShader.SetFloat("_Spacing", spacing);
+			computeShader.SetInt("_DensityChoice", densityChoiceId);
 			computeShader.SetFloat(randomFactorId, randomFactor);
-			computeShader.SetFloat(tilingId, tiling);
-			computeShader.SetFloat(octaveId, octaves);
-			computeShader.SetFloat(growValId, grow);
-			computeShader.SetFloat(growValId2, grow2);
+			computeShader.SetFloat(tilingId, terrainMaterial.GetFloat("_Tiling"));
+			computeShader.SetFloat(octaveId, terrainMaterial.GetFloat("_Octaves"));
+			computeShader.SetFloat("_DisplacementAmount", terrainMaterial.GetFloat("_DisplacementAmount"));
+			computeShader.SetFloat(growValId, instanceADensityMapFactor);
+			computeShader.SetFloat(growValId2, instanceBDensityMapFactor);
 
 			var kernelIndex = computeShader.FindKernel("CSMain");
 			computeShader.SetBuffer(kernelIndex, positionsId, positionsBufferA);
 			computeShader.SetBuffer(kernelIndex, positionsId2, positionsBufferB);
 
-			int groups = Mathf.FloorToInt(resolution / 8f); // ceilToInt got some issues, use floor for now.
-			computeShader.Dispatch(kernelIndex, groups, groups, 1);
+			computeShader.Dispatch(kernelIndex, numOfGroups, numOfGroups, 1);
 
 			// async request positionbuffer2, the result will be returned after few frames
 			UnityEngine.Rendering.AsyncGPUReadback.Request(positionsBufferB, r =>
@@ -112,20 +147,25 @@ namespace Demo_ProceduralPlacement
 						Vector3 pos = (Vector3)data[i];
 						// set condition to only spawn what's needed
 						// Debug.Log(Vector3.Distance(Vector3.zero, data[i]));
-						if (Vector3.Distance(player.transform.position, data[i]) < 3 )//&& pos != Vector3.zero)
+						if (Vector3.Distance(player.transform.position, data[i]) < 5 )//&& pos != Vector3.zero)
 						{
-							pos.y *= 10;
 							GameObject col = Instantiate(instanceBCollider, pos, Quaternion.identity);
 							col.transform.parent = collisionParent.transform;
 						}
 					}
-					Debug.Log(collisionParent.transform.childCount); // check actual spawned objs.
+					// Debug.Log(collisionParent.transform.childCount); // check actual spawned objs.
 					done = true;
 				}
 			});
 
 			instanceAMaterial.SetBuffer(positionsId, positionsBufferA);
 			instanceBMaterial.SetBuffer(positionsId, positionsBufferB);
+			instanceAMaterial.SetFloat("_UseScale", (float)(useScale ? 1.0 : 0.0));
+			instanceBMaterial.SetFloat("_UseScale", (float)(useScale ? 1.0 : 0.0));
+			instanceAMaterial.SetFloat("_InvertScale", (float)(invertScale ? 1.0 : 0.0));
+			instanceBMaterial.SetFloat("_InvertScale", (float)(invertScale ? 1.0 : 0.0));
+			instanceAMaterial.SetFloat("_DisplacementAmount", terrainMaterial.GetFloat("_DisplacementAmount"));
+			instanceBMaterial.SetFloat("_DisplacementAmount", terrainMaterial.GetFloat("_DisplacementAmount"));
 			var bounds = new Bounds(Vector3.zero, Vector3.one * (2f + 2f / resolution));
 
 			Graphics.DrawMeshInstancedProcedural(

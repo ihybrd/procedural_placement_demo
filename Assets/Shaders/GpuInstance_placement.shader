@@ -2,10 +2,10 @@ Shader "Demo/GpuInstance_placement"
 {
     Properties
     {
-        _Tiling("_Tiling", Float) = 0.1
-        _Octaves("_Octaves", Float) = 1
-        _DisplacementAmount("_DisplacementAmount", Float) = 1
         _Color ("Color", COLOR) = (1,1,1,1)
+        _DisplacementAmount ("DisplacementAmount", Float) = 10
+        [Toggle] _UseScale ("Size Based On Height", Float) = 0
+        [Toggle] _InvertScale ("Size Based On Height (Invert)", Float) = 0
     }
     SubShader
     {
@@ -30,11 +30,10 @@ Shader "Demo/GpuInstance_placement"
             uniform float4x4 _ObjectToWorld;
             StructuredBuffer<float3> _Positions;
 
-            float _Tiling;
-            float _Octaves;
-            float _DisplacementAmount;
             float4 _Color;
-
+            float _UseScale;
+            float _InvertScale;
+            float _DisplacementAmount;
             
             float2 get_cos_sin(float a){
                 float c = cos(radians(a));
@@ -106,7 +105,10 @@ Shader "Demo/GpuInstance_placement"
                   
                 float3 p = _Positions[instanceID]; // position from the buffer
                 
-                float s = 1-p.y;
+                float scaleValue = (_InvertScale==0) ? (p.y/_DisplacementAmount) : (1-p.y/_DisplacementAmount);
+                scaleValue *= 2; // in order to emphsis the look
+
+                float s = (_UseScale == 0)?1:scaleValue;
                 float3 S = float3(s,s,s);
                
                 float4x4 m_S = {S.x,0, 0, 0,
@@ -123,7 +125,7 @@ Shader "Demo/GpuInstance_placement"
 
                 float4x4 m = mul(unity_ObjectToWorld, mul(m_R, m_S));
 
-                float4 wpos = mul(m, v.vertex) + float4(p.x, p.y*10, p.z, 0); // use object space
+                float4 wpos = mul(m, v.vertex) + float4(p.x, p.y, p.z, 0); // use object space
 
                 o.pos = mul(UNITY_MATRIX_VP, wpos);
                 o.color = _Color * lerp(0.25,1,v.vertex.y); // green color based on local height of the mesh

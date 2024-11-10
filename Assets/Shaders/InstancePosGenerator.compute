@@ -6,10 +6,13 @@ RWStructuredBuffer<float3> _Positions;
 RWStructuredBuffer<float3> _Positions2;
 uint _Resolution;
 float _Density;
+int _DensityChoice;
+float _Spacing;
 float _RandomFactor;
 
 float _Octaves;
 float _Tiling;
+float _DisplacementAmount;
 float _GrowValue;
 float _GrowValue2;
 
@@ -24,11 +27,12 @@ void SetPosition2 (uint3 id, float3 position) {
 	}
 }
 
-[numthreads(8,8,1)]
+[numthreads(16,16,1)]
 void CSMain (uint3 id : SV_DispatchThreadID)
 {
     // fetch group info
-    float group = floor(_Resolution/8);
+    float numgroups = 8.0;//floor(_Resolution/16);
+    float numthreads = 16.0;
 
     float ditherPatter[4][4] = {
         {0,  8,  2,  10},
@@ -38,8 +42,8 @@ void CSMain (uint3 id : SV_DispatchThreadID)
     };
 
     // .xz position affected by resolution and density
-    float x = ((float)id.x*2-8*group)*_Density;
-    float z = ((float)id.y*2-8*group)*_Density;
+    float x = ((float)id.x-numthreads*numgroups/2)*2*_Spacing;
+    float z = ((float)id.y-numthreads*numgroups/2)*2*_Spacing;
 
     //float noise = perlinNoise(float2(x, z), 0.1);
     float noise = 0;
@@ -48,27 +52,52 @@ void CSMain (uint3 id : SV_DispatchThreadID)
         noise += perlinNoise(float2(x, z), _Tiling * a)/a;
     }
     noise = (noise + 1)/2; // convert from -1,1 to 0,1
-    float density_noise_1 = 1-noise;
-    density_noise_1 *= _GrowValue;
+    // noise *= _DisplacementAmount;
+    float density_noise_1 = noise*_GrowValue;
 
-    float density_noise_2 = noise * _GrowValue2;
+    float density_noise_2 = noise*_GrowValue2;// * _GrowValue2;
 
     float density_noise_1_2 = density_noise_1 + density_noise_2; // simply add them together!!
 
     // generate dither value for the placement
     float r = ditherPatter[id.x%4][id.y%4]/16;
 
-    if (r < density_noise_1) {
-        // get random offset along witht the direction
-        float2 dir = normalize(randomGradient(float2(x, z)))*_RandomFactor;
-        SetPosition(id, float3(x+dir.x, noise, z+dir.y));        
-        SetPosition2(id, float3(0,5,0));        
-    } else if (r < density_noise_1_2 && r >= density_noise_1) {
-        float2 dir = normalize(randomGradient(float2(x, z)))*_RandomFactor;
-        SetPosition2(id, float3(x+dir.x, noise, z+dir.y));        
-        SetPosition(id, float3(0,5,0));        
+    int density_choice = _DensityChoice;
+
+    if (density_choice == 0) {
+        if (r < _Density) {
+            SetPosition(id, float3(x, noise*_DisplacementAmount, z));        
+        } else {
+            SetPosition(id, float3(0,0,0));
+        }
+        SetPosition2(id, float3(0,0,0));
+    } else if (density_choice == 1) {
+        if (r < id.x/(numgroups * numthreads)) {
+            SetPosition(id, float3(x, noise*_DisplacementAmount, z));        
+        } else {
+            SetPosition(id, float3(0,100,0));
+        }
+        SetPosition2(id, float3(0,100,0));
+    } else if (density_choice == 2) {
+        if (r < 1-noise) {
+            SetPosition(id, float3(x, noise*_DisplacementAmount, z));        
+        } else {
+            SetPosition(id, float3(0,100,0));
+        }
+        SetPosition2(id, float3(0,100,0));
     } else {
-        SetPosition(id, float3(0,5,0));
-        SetPosition2(id, float3(0,5,0));
+        if (r < density_noise_1) {
+            // get random offset along witht the direction
+            float2 dir = normalize(randomGradient(float2(x, z)))*_RandomFactor;
+            SetPosition(id, float3(x+dir.x, noise*_DisplacementAmount, z+dir.y));        
+            SetPosition2(id, float3(0,100,0));        
+        } else if (r <= density_noise_1_2 && r >= density_noise_1) {
+            float2 dir = normalize(randomGradient(float2(x, z)))*_RandomFactor;
+            SetPosition2(id, float3(x+dir.x, noise*_DisplacementAmount, z+dir.y));        
+            SetPosition(id, float3(0,100,0));        
+        } else {
+            SetPosition(id, float3(0,100,0));
+            SetPosition2(id, float3(0,100,0));
+        }
     }
 }

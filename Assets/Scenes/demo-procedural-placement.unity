@@ -651,7 +651,7 @@ Transform:
   m_GameObject: {fileID: 1535449593}
   serializedVersion: 2
   m_LocalRotation: {x: 0, y: 0, z: 0, w: 1}
-  m_LocalPosition: {x: -11.4, y: 0, z: -11.3}
+  m_LocalPosition: {x: 8, y: 0, z: 8}
   m_LocalScale: {x: 1, y: 1, z: 1}
   m_ConstrainProportionsScale: 0
   m_Children: []
@@ -993,18 +993,20 @@ MonoBehaviour:
   instanceAMesh: {fileID: -2432090755550338912, guid: 8a9d909b9892c4ffeb43a90b8f3c9767,
     type: 3}
   instanceBMaterial: {fileID: 2100000, guid: 0d85274910bf346da889a04bb230ea8c, type: 2}
-  instanceBMesh: {fileID: 10202, guid: 0000000000000000e000000000000000, type: 0}
+  instanceBMesh: {fileID: -2432090755550338912, guid: 8a9d909b9892c4ffeb43a90b8f3c9767,
+    type: 3}
   instanceBCollider: {fileID: 6037556672558855288, guid: 2ec2191bfe53a4ed2a05c180533e6149,
     type: 3}
   collisionParent: {fileID: 1312992388}
-  resolution: 200
-  density: 0.1
+  densityChoice: 3
+  densityConstant: 1
+  spacing: 0.165
   randomFactor: 0
-  tiling: 0.1
-  octaves: 5
-  grow: 1.72
-  grow2: 0.04
+  instanceADensityMapFactor: 1
+  instanceBDensityMapFactor: 1
   player: {fileID: 1535449593}
+  useScale: 1
+  invertScale: 0
 --- !u!4 &1908534132
 Transform:
   m_ObjectHideFlags: 0
